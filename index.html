@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>একাউন্ট অ্যাক্সেস</title>
+    
+    <!-- Firebase SDK (শুধুমাত্র Database-এর জন্য) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database.js"></script>
+    
+    <!-- CSS: Simple Auth Style -->
+    <style>
+        :root { --primary-color: #9060eb; --bg-light: #f0f0f5; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-light); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .auth-container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); width: 300px; text-align: center; }
+        h2 { color: var(--primary-color); margin-bottom: 20px; }
+        input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin-top: 10px; transition: background-color 0.3s; }
+        button:hover:not(:disabled) { background-color: #7d49e7; }
+        button:disabled { background-color: #a0a0a0; cursor: not-allowed; } 
+        p.warning { color: #e74c3c; font-size: 12px; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="auth-container">
+        <h2>জিমেইল দিয়ে অ্যাক্সেস করুন</h2>
+        <input type="email" id="email" placeholder="ইমেইল" required>
+        <!-- বাটনটি ডিফল্টভাবে disabled থাকবে -->
+        <button id="accessBtn" onclick="accessAccount()" disabled>অ্যাকাউন্ট অ্যাক্সেস করুন</button>
+        <p class="warning">সতর্কতা: এই পদ্ধতিটি শুধুমাত্র ডেমোর জন্য। এটি নিরাপত্তাহীন।</p>
+    </div>
+
+    <script>
+        // ** Firebase Configuration & Init (Updated with new config) **
+        const firebaseConfig = {
+            apiKey: "AIzaSyAaVnqaTY2iD09hGJtDPkKBVwSxLCayho0", authDomain: "trading-47a4c.firebaseapp.com", databaseURL: "https://trading-47a4c-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "trading-47a4c", storageBucket: "trading-47a4c.firebasestorage.app", messagingSenderId: "1043281941346", appId: "1:1043281941346:web:da231debf9836928a3523b"
+        };
+        
+        let db;
+        
+        // Firebase Initialization Function
+        function initializeFirebase() {
+            if (typeof firebase === 'undefined' || firebase.apps.length > 0) return;
+            
+            try {
+                const app = firebase.initializeApp(firebaseConfig);
+                db = firebase.database();
+                
+                // ইনিশিয়ালাইজেশন সফল হলে বাটন সক্রিয় করুন
+                document.getElementById('accessBtn').disabled = false;
+                document.getElementById('accessBtn').textContent = 'অ্যাকাউন্ট অ্যাক্সেস করুন';
+                console.log("Firebase Database initialized.");
+
+            } catch (error) { 
+                console.error("Firebase Initialization Failed:", error); 
+                document.getElementById('accessBtn').textContent = 'ত্রুটি'; 
+                alert("Firebase Initialization Failed. Check your config and hosting URL.");
+            }
+        }
+        
+        // জিমেইলকে একটি ডামি ইউজার আইডি-তে পরিবর্তন করার ফাংশন (নিরাপত্তাহীন)
+        function emailToUid(email) {
+            return 'user_' + btoa(email).replace(/=/g, '').substring(0, 10);
+        }
+
+        // অ্যাকাউন্ট অ্যাক্সেস করার ফাংশন
+        function accessAccount() {
+            if (!db) { 
+                alert("Database service not initialized.");
+                return;
+            }
+            
+            const email = document.getElementById('email').value.toLowerCase().trim();
+            if (!email || !email.includes('@')) { alert("বৈধ ইমেইল দিন।"); return; }
+
+            const dummyUserId = emailToUid(email);
+            const userRef = db.ref('users/' + dummyUserId);
+            
+            userRef.once('value')
+                .then(snapshot => {
+                    if (snapshot.exists()) {
+                        // 1. পুরাতন ডেটা পেয়েছে
+                        alert("লগইন সফল! ডেটা পুনরুদ্ধার করা হচ্ছে।");
+                        localStorage.setItem('userToken', dummyUserId); 
+                        window.location.href = 'user_app.html';
+                    } else {
+                        // 2. নতুন ইউজার, ডেটা তৈরি করা হচ্ছে
+                        return userRef.set({
+                            email: email,
+                            balance: 0.00,
+                            name: email.split('@')[0],
+                            profilePic: 'default',
+                            pendingReward: null,
+                            referralId: dummyUserId.substring(0, 8),
+                            referralCount: 0
+                        }).then(() => {
+                            alert("অ্যাকাউন্ট তৈরি সফল! এগিয়ে যান।");
+                            localStorage.setItem('userToken', dummyUserId); 
+                            window.location.href = 'user_app.html';
+                        });
+                    }
+                })
+                .catch(error => alert(`অ্যাক্সেস ব্যর্থ: ${error.message}`));
+        }
+
+        // ডকুমেন্ট লোড হওয়ার পর Firebase শুরু করুন
+        document.addEventListener('DOMContentLoaded', initializeFirebase);
+    </script>
+</body>
+</html>
